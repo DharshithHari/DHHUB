@@ -1,7 +1,4 @@
 {
-  // Explicitly instruct Vercel to call our npm build script.
-  // This avoids Vercel trying to execute ./node_modules/.bin/vite directly
-  // which can fail if the executable bit is missing.
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "build"
 }
