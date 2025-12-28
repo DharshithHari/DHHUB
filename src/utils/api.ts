@@ -16,7 +16,10 @@ const BASE_URL = envBase || ((typeof window !== 'undefined' && (window.location.
 // If the developer sets `VITE_API_BASE=LOCAL_MOCK` we bypass network calls and
 // use an in-browser mock implementation. This is useful when DNS/network to
 // the real function host is unreliable during local development.
-const USE_CLIENT_MOCK = envBase === 'LOCAL_MOCK';
+// Enable client mock when explicitly requested, or by default on localhost
+// when no `VITE_API_BASE` override is provided. This prevents the client
+// from attempting network calls to unreachable hosts during local dev.
+const USE_CLIENT_MOCK = envBase === 'LOCAL_MOCK' || (typeof window !== 'undefined' && !envBase && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'));
 
 // Simple in-client mock implementation for the minimal auth endpoints used
 // during development. It stores a demo session id in localStorage so the
