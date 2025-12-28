@@ -36,13 +36,25 @@ async function apiCall(endpoint: string, options: RequestInit = {}) {
     ...options,
     headers,
   });
+  let responseBody: any = null;
+  try {
+    if (!response.ok) {
+      responseBody = await response.json().catch(() => ({ error: 'Request failed' }));
+      throw new Error(responseBody.error || 'Request failed');
+    }
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(error.error || 'Request failed');
+    responseBody = await response.json().catch(() => null);
+    return responseBody;
+  } catch (fetchErr: any) {
+    // If fetch itself failed (network error) it will be a TypeError with message 'Failed to fetch'
+    if (fetchErr instanceof TypeError) {
+      console.error('Network error when calling API:', `${BASE_URL}${endpoint}`, fetchErr);
+      throw new Error(`Network error: could not reach API (${fetchErr.message}). Please check your internet connection or that the API URL is correct: ${BASE_URL}${endpoint}`);
+    }
+
+    // Re-throw other errors (including those created above from responseBody)
+    throw fetchErr;
   }
-
-  return response.json();
 }
 
 export const api = {
