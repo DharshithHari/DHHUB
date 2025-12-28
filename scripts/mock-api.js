@@ -13,6 +13,17 @@ function jsonResponse(res, status, obj) {
 const server = http.createServer((req, res) => {
   const { method, url } = req;
 
+  // Basic CORS handling so browser can call this mock from another origin (vite dev server)
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Session-ID');
+
+  // Handle preflight
+  if (method === 'OPTIONS') {
+    res.writeHead(204);
+    return res.end();
+  }
+
   // Expect path like /functions/v1/make-server-f258bbc4/auth/login
   if (method === 'POST' && url.endsWith('/auth/login')) {
     let body = '';
