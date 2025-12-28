@@ -366,7 +366,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               className={`flex items-center gap-2 px-6 py-3 rounded-lg transition-colors whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'bg-indigo-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
+                  : `${isDark ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-white text-gray-700 hover:bg-gray-50'}`
               }`}
             >
               <tab.icon className="w-5 h-5" />
@@ -434,12 +434,12 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                         />
                       </div>
                       <div className="flex gap-2">
-                        <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-                          Create
-                        </button>
-                        <button type="button" onClick={() => setShowNewBatch(false)} className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
-                          Cancel
-                        </button>
+                                <button type="submit" className={`px-4 py-2 ${isDark ? 'bg-indigo-500 text-white hover:bg-indigo-600' : 'bg-indigo-600 text-white hover:bg-indigo-700'} rounded-lg`}>
+                                  Create
+                                </button>
+                                <button type="button" onClick={() => setShowNewBatch(false)} className={`px-4 py-2 ${isDark ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-300 text-gray-700 hover:bg-gray-400'} rounded-lg`}>
+                                  Cancel
+                                </button>
                       </div>
                     </div>
                   </form>
@@ -511,13 +511,13 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                             <div className="flex gap-2">
                               <button
                                 onClick={() => setEditingBatch(batch)}
-                                className="p-2 text-indigo-600 hover:bg-indigo-50 rounded"
+                                className={`p-2 rounded ${isDark ? 'text-indigo-300 hover:bg-indigo-700/20' : 'text-indigo-600 hover:bg-indigo-50'}`}
                               >
                                 <Edit className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => handleDeleteBatch(batch.id)}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded"
+                                className={`p-2 rounded ${isDark ? 'text-red-400 hover:bg-red-700/10' : 'text-red-600 hover:bg-red-50'}`}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -532,7 +532,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                                   <span className="text-sm">{student.name}</span>
                                   <button
                                     onClick={() => handleRemoveStudentFromBatch(batch.id, student.id)}
-                                    className="text-red-600 hover:text-red-800"
+                                    className={`${isDark ? 'text-red-400 hover:text-red-200' : 'text-red-600 hover:text-red-800'}`}
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </button>
@@ -571,12 +571,12 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
             )}
 
             {activeTab === 'users' && (
-              <div className="bg-white p-6 rounded-xl shadow-lg">
+                  <div className={`${isDark ? 'bg-gray-800/60' : 'bg-white'} p-6 rounded-xl shadow-lg`}>
                 <div className="flex items-center justify-between mb-6">
                   <h2>User Management</h2>
                   <button
                     onClick={() => setShowNewUser(!showNewUser)}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${isDark ? 'bg-indigo-500 text-white hover:bg-indigo-600' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
                   >
                     <UserPlus className="w-4 h-4" />
                     New User
@@ -644,10 +644,10 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                         </div>
                       )}
                       <div className="flex gap-2">
-                        <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                        <button type="submit" className={`px-4 py-2 ${isDark ? 'bg-indigo-500 text-white hover:bg-indigo-600' : 'bg-indigo-600 text-white hover:bg-indigo-700'} rounded-lg`}>
                           Create
                         </button>
-                        <button type="button" onClick={() => setShowNewUser(false)} className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
+                        <button type="button" onClick={() => setShowNewUser(false)} className={`px-4 py-2 ${isDark ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-300 text-gray-700 hover:bg-gray-400'} rounded-lg`}>
                           Cancel
                         </button>
                       </div>
@@ -676,13 +676,13 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                               <div className="flex gap-2">
                                 <button
                                   onClick={() => handleUpdateUser(teacher.id, { name: editingUser.name, username: editingUser.username })}
-                                  className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                                  className={`px-3 py-1 rounded ${isDark ? 'bg-indigo-500 text-white hover:bg-indigo-600' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
                                 >
                                   Save
                                 </button>
                                 <button
                                   onClick={() => setEditingUser(null)}
-                                  className="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                                  className={`px-3 py-1 rounded ${isDark ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-300 text-gray-700 hover:bg-gray-400'}`}
                                 >
                                   Cancel
                                 </button>
@@ -697,13 +697,13 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => handleEditUser(teacher)}
-                                  className="p-2 text-indigo-600 hover:bg-indigo-50 rounded"
+                                  className={`p-2 rounded ${isDark ? 'text-indigo-300 hover:bg-indigo-700/20' : 'text-indigo-600 hover:bg-indigo-50'}`}
                                 >
                                   <Edit className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => handleDeleteUser(teacher.id)}
-                                  className="p-2 text-red-600 hover:bg-red-50 rounded"
+                                  className={`p-2 rounded ${isDark ? 'text-red-400 hover:bg-red-700/10' : 'text-red-600 hover:bg-red-50'}`}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -772,13 +772,13 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => handleEditUser(student)}
-                                  className="p-2 text-indigo-600 hover:bg-indigo-50 rounded"
+                                  className={`p-2 rounded ${isDark ? 'text-indigo-300 hover:bg-indigo-700/20' : 'text-indigo-600 hover:bg-indigo-50'}`}
                                 >
                                   <Edit className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => handleDeleteUser(student.id)}
-                                  className="p-2 text-red-600 hover:bg-red-50 rounded"
+                                  className={`p-2 rounded ${isDark ? 'text-red-400 hover:bg-red-700/10' : 'text-red-600 hover:bg-red-50'}`}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
