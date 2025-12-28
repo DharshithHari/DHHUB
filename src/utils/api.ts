@@ -1,6 +1,11 @@
 import { projectId, publicAnonKey } from './supabase/info';
 
-const BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-f258bbc4`;
+const DEFAULT_BASE = `https://${projectId}.supabase.co/functions/v1/make-server-f258bbc4`;
+const LOCAL_FALLBACK = `http://localhost:4000/functions/v1/make-server-f258bbc4`;
+
+const BASE_URL = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+  ? LOCAL_FALLBACK
+  : DEFAULT_BASE;
 
 let sessionId: string | null = null;
 
