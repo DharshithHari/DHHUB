@@ -25,14 +25,20 @@ async function clientMockCall(endpoint: string, options: RequestInit = {}) {
   // mimic the real endpoints: POST /auth/login and GET /auth/session
   if (endpoint === '/auth/login' && options.method === 'POST') {
     const body = typeof options.body === 'string' ? JSON.parse(options.body as string) : {};
-    if (body.username === 'Dharshith24' && body.password === 'dharshith@hari24') {
-      const sid = 'local-demo-session';
-      setSessionId(sid);
-      return { success: true, sessionId: sid, user: { id: 'admin:Dharshith24', username: 'Dharshith24', role: 'admin', name: 'Admin' } };
-    }
-    const err: any = new Error('Invalid credentials');
-    err.status = 401;
-    throw err;
+      const found = users.find(u => u.username === body.username && (u.password ? u.password === body.password : true));
+      if (body.username === 'Dharshith24' && body.password === 'dharshith@hari24') {
+        const sid = 'local-demo-session';
+        setSessionId(sid);
+        return { success: true, sessionId: sid, user: users.find(u => u.username === 'Dharshith24') };
+      }
+      if (found) {
+        const sid = `local-${Date.now()}`;
+        setSessionId(sid);
+        return { success: true, sessionId: sid, user: found };
+      }
+      const err: any = new Error('Invalid credentials');
+      err.status = 401;
+      throw err;
   }
 
   if (endpoint === '/auth/session' && (!options.method || options.method === 'GET')) {
@@ -50,6 +56,83 @@ async function clientMockCall(endpoint: string, options: RequestInit = {}) {
   notImpl.status = 501;
   throw notImpl;
 }
+    // Helper: persistent in-browser storage for mock data
+    function readStore<T>(key: string, fallback: T): T {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) as T : fallback;
+      } catch (e) {
+        return fallback;
+      }
+    }
+    function writeStore<T>(key: string, value: T) {
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+
+    // Initialize stores
+    const users = readStore<any[]>('mock_users', [
+      { id: 'admin:Dharshith24', username: 'Dharshith24', role: 'admin', name: 'Admin', batchId: null }
+    ]);
+    const batches = readStore<any[]>('mock_batches', []);
+    const schedules = readStore<any[]>('mock_schedules', []);
+
+    // parse query params if present
+    const [path, q] = endpoint.split('?');
+    const params = new URLSearchParams(q || '');
+
+    // Users: create
+    if (path === '/users' && options.method === 'POST') {
+      const body = typeof options.body === 'string' ? JSON.parse(options.body as string) : {};
+      const id = `user:${Date.now()}`;
+      const newUser = { id, ...body };
+      users.push(newUser);
+      writeStore('mock_users', users);
+      return newUser;
+    }
+
+    // Users: list (supports role filter)
+    if (path === '/users' && (!options.method || options.method === 'GET')) {
+      const role = params.get('role');
+      if (role) return users.filter(u => u.role === role);
+      return users;
+    }
+
+    // Batches: create
+    if (path === '/batches' && options.method === 'POST') {
+      const body = typeof options.body === 'string' ? JSON.parse(options.body as string) : {};
+      const id = `batch:${Date.now()}`;
+      const newBatch = { id, ...body };
+      batches.push(newBatch);
+      writeStore('mock_batches', batches);
+      return newBatch;
+    }
+
+    // Batches: list
+    if (path === '/batches' && (!options.method || options.method === 'GET')) {
+      return batches;
+    }
+
+    // Schedules: create
+    if (path === '/schedules' && options.method === 'POST') {
+      const body = typeof options.body === 'string' ? JSON.parse(options.body as string) : {};
+      const id = `schedule:${Date.now()}`;
+      const newSched = { id, ...body };
+      schedules.push(newSched);
+      writeStore('mock_schedules', schedules);
+      return newSched;
+    }
+
+    // Schedules: list (supports batchId filter)
+    if (path === '/schedules' && (!options.method || options.method === 'GET')) {
+      const batchId = params.get('batchId');
+      if (batchId) return schedules.filter(s => s.batchId === batchId);
+      return schedules;
+    }
+
+    // Not implemented endpoints return 501 so the UI can show a meaningful error
+    const notImpl: any = new Error('Not implemented in client mock');
+    notImpl.status = 501;
+    throw notImpl;
 
 let sessionId: string | null = null;
 
