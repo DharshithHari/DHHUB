@@ -3,9 +3,15 @@ import { projectId, publicAnonKey } from './supabase/info';
 const DEFAULT_BASE = `https://${projectId}.supabase.co/functions/v1/make-server-f258bbc4`;
 const LOCAL_FALLBACK = `http://localhost:4000/functions/v1/make-server-f258bbc4`;
 
-const BASE_URL = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+// Allow explicit override via Vite env var VITE_API_BASE (set this when running dev to force localhost)
+declare const import_meta: any;
+const envBase = typeof (import.meta) !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_BASE
+  ? (import.meta as any).env.VITE_API_BASE
+  : null;
+
+const BASE_URL = envBase || ((typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
   ? LOCAL_FALLBACK
-  : DEFAULT_BASE;
+  : DEFAULT_BASE);
 
 let sessionId: string | null = null;
 
