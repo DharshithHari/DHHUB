@@ -107,14 +107,23 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
           api.getAssignments(teacherBatch.id),
           api.getUsers('student')
         ]);
-        
+
         setAssignments(assignmentsRes.assignments || []);
-        
-        // Filter students in this batch
-        const batchStudents = usersRes.users.filter((s: any) => 
-          s.batchId === teacherBatch.id
-        );
-        setStudents(batchStudents);
+
+        // Filter students in this batch. If the students list is empty or
+        // doesn't include expected students, also fetch all users and
+        // resolve by `batch.studentIds` as a fallback (some mocks/store
+        // shapes use batch.studentIds instead of setting student.batchId).
+        let batchStudents = (usersRes && usersRes.users) ? usersRes.users.filter((s: any) => s.batchId === teacherBatch.id) : [];
+
+        if ((batchStudents.length === 0 || !batchStudents.some((s: any) => s.batchId === teacherBatch.id)) && teacherBatch.studentIds && teacherBatch.studentIds.length > 0) {
+          // fetch all users and match by id
+          const allUsersRes = await api.getUsers();
+          const allUsers = (allUsersRes && allUsersRes.users) ? allUsersRes.users : [];
+          batchStudents = teacherBatch.studentIds.map((id: string) => allUsers.find((u: any) => u.id === id)).filter(Boolean);
+        }
+
+        setStudents(batchStudents || []);
       }
     } catch (error) {
       console.error('Failed to load data:', error);
