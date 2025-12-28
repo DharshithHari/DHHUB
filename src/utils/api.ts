@@ -183,6 +183,20 @@ async function apiCall(endpoint: string, options: RequestInit = {}) {
     // If fetch itself failed (network error) it will be a TypeError with message 'Failed to fetch'
     if (fetchErr instanceof TypeError) {
       console.error('Network error when calling API:', `${BASE_URL}${endpoint}`, fetchErr);
+
+      // Development convenience: if we're running on localhost, attempt to
+      // service the request from the in-browser client mock as a fallback so
+      // developers don't get blocked by external DNS/network issues.
+      try {
+        if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+          console.warn('Fetch failed; falling back to client mock for', endpoint);
+          const mockResult = await clientMockCall(endpoint, options);
+          return mockResult;
+        }
+      } catch (mockErr) {
+        console.warn('Client mock also failed:', mockErr);
+      }
+
       throw new Error(`Network error: could not reach API (${fetchErr.message}). Please check your internet connection or that the API URL is correct: ${BASE_URL}${endpoint}`);
     }
 
