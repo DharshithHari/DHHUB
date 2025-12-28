@@ -13,6 +13,44 @@ const BASE_URL = envBase || ((typeof window !== 'undefined' && (window.location.
   ? LOCAL_FALLBACK
   : DEFAULT_BASE);
 
+// If the developer sets `VITE_API_BASE=LOCAL_MOCK` we bypass network calls and
+// use an in-browser mock implementation. This is useful when DNS/network to
+// the real function host is unreliable during local development.
+const USE_CLIENT_MOCK = envBase === 'LOCAL_MOCK';
+
+// Simple in-client mock implementation for the minimal auth endpoints used
+// during development. It stores a demo session id in localStorage so the
+// rest of the app can continue using `getSessionId()`.
+async function clientMockCall(endpoint: string, options: RequestInit = {}) {
+  // mimic the real endpoints: POST /auth/login and GET /auth/session
+  if (endpoint === '/auth/login' && options.method === 'POST') {
+    const body = typeof options.body === 'string' ? JSON.parse(options.body as string) : {};
+    if (body.username === 'Dharshith24' && body.password === 'dharshith@hari24') {
+      const sid = 'local-demo-session';
+      setSessionId(sid);
+      return { success: true, sessionId: sid, user: { id: 'admin:Dharshith24', username: 'Dharshith24', role: 'admin', name: 'Admin' } };
+    }
+    const err: any = new Error('Invalid credentials');
+    err.status = 401;
+    throw err;
+  }
+
+  if (endpoint === '/auth/session' && (!options.method || options.method === 'GET')) {
+    const sid = getSessionId();
+    if (sid === 'local-demo-session') {
+      return { user: { id: 'admin:Dharshith24', username: 'Dharshith24', role: 'admin', name: 'Admin' } };
+    }
+    const err: any = new Error('No session');
+    err.status = 401;
+    throw err;
+  }
+
+  // For other endpoints the mock is not implemented yet.
+  const notImpl: any = new Error('Not implemented in client mock');
+  notImpl.status = 501;
+  throw notImpl;
+}
+
 let sessionId: string | null = null;
 
 export function setSessionId(id: string | null) {
@@ -32,6 +70,9 @@ export function getSessionId(): string | null {
 }
 
 async function apiCall(endpoint: string, options: RequestInit = {}) {
+  if (USE_CLIENT_MOCK) {
+    return clientMockCall(endpoint, options);
+  }
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${publicAnonKey}`,
