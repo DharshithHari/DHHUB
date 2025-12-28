@@ -88,14 +88,33 @@ async function clientMockCall(endpoint: string, options: RequestInit = {}) {
     const newUser = { id, ...body };
     users.push(newUser);
     writeStore('mock_users', users);
-    return newUser;
+    return { user: newUser };
   }
 
   // Users: list (supports role filter)
   if (path === '/users' && (!options.method || options.method === 'GET')) {
     const role = params.get('role');
-    if (role) return users.filter(u => u.role === role);
-    return users;
+    const filtered = role ? users.filter(u => u.role === role) : users;
+    return { users: filtered };
+  }
+
+  // Users: update/delete by id
+  if (path.startsWith('/users/') && (options.method === 'PUT' || options.method === 'DELETE')) {
+    const id = path.replace('/users/', '');
+    const idx = users.findIndex(u => u.id === id);
+    if (idx === -1) {
+      const err: any = new Error('Not found'); err.status = 404; throw err;
+    }
+    if (options.method === 'DELETE') {
+      users.splice(idx, 1);
+      writeStore('mock_users', users);
+      return { success: true };
+    }
+    // PUT
+    const body = typeof options.body === 'string' ? JSON.parse(options.body as string) : {};
+    users[idx] = { ...users[idx], ...body };
+    writeStore('mock_users', users);
+    return { user: users[idx] };
   }
 
   // Batches: create
@@ -105,12 +124,28 @@ async function clientMockCall(endpoint: string, options: RequestInit = {}) {
     const newBatch = { id, ...body };
     batches.push(newBatch);
     writeStore('mock_batches', batches);
-    return newBatch;
+    return { batch: newBatch };
   }
 
   // Batches: list
   if (path === '/batches' && (!options.method || options.method === 'GET')) {
-    return batches;
+    return { batches };
+  }
+
+  // Batches: update/delete by id
+  if (path.startsWith('/batches/') && (options.method === 'PUT' || options.method === 'DELETE')) {
+    const id = path.replace('/batches/', '');
+    const idx = batches.findIndex(b => b.id === id);
+    if (idx === -1) { const err: any = new Error('Not found'); err.status = 404; throw err; }
+    if (options.method === 'DELETE') {
+      batches.splice(idx, 1);
+      writeStore('mock_batches', batches);
+      return { success: true };
+    }
+    const body = typeof options.body === 'string' ? JSON.parse(options.body as string) : {};
+    batches[idx] = { ...batches[idx], ...body };
+    writeStore('mock_batches', batches);
+    return { batch: batches[idx] };
   }
 
   // Schedules: create
@@ -120,14 +155,62 @@ async function clientMockCall(endpoint: string, options: RequestInit = {}) {
     const newSched = { id, ...body };
     schedules.push(newSched);
     writeStore('mock_schedules', schedules);
-    return newSched;
+    return { schedule: newSched };
   }
 
   // Schedules: list (supports batchId filter)
   if (path === '/schedules' && (!options.method || options.method === 'GET')) {
     const batchId = params.get('batchId');
-    if (batchId) return schedules.filter(s => s.batchId === batchId);
-    return schedules;
+    const filtered = batchId ? schedules.filter(s => s.batchId === batchId) : schedules;
+    return { schedules: filtered };
+  }
+
+  // Schedules: update/delete by id
+  if (path.startsWith('/schedules/') && (options.method === 'PUT' || options.method === 'DELETE')) {
+    const id = path.replace('/schedules/', '');
+    const idx = schedules.findIndex(s => s.id === id);
+    if (idx === -1) { const err: any = new Error('Not found'); err.status = 404; throw err; }
+    if (options.method === 'DELETE') {
+      schedules.splice(idx, 1);
+      writeStore('mock_schedules', schedules);
+      return { success: true };
+    }
+    const body = typeof options.body === 'string' ? JSON.parse(options.body as string) : {};
+    schedules[idx] = { ...schedules[idx], ...body };
+    writeStore('mock_schedules', schedules);
+    return { schedule: schedules[idx] };
+  }
+
+  // Notifications store
+  const notifications = readStore<any[]>('mock_notifications', []);
+
+  // Create notification
+  if (path === '/notifications' && options.method === 'POST') {
+    const body = typeof options.body === 'string' ? JSON.parse(options.body as string) : {};
+    const id = `notif:${Date.now()}`;
+    const timestamp = new Date().toISOString();
+    const newNotif = { id, timestamp, ...body };
+    notifications.unshift(newNotif);
+    writeStore('mock_notifications', notifications);
+    return { notification: newNotif };
+  }
+
+  // Get notifications
+  if (path === '/notifications' && (!options.method || options.method === 'GET')) {
+    const roleParam = params.get('role');
+    const batchId = params.get('batchId');
+    const userId = params.get('userId');
+    let filtered = notifications.slice();
+    if (roleParam) {
+      filtered = filtered.filter(n => n.targetRole === 'all' || n.targetRole === roleParam);
+    }
+    if (batchId) {
+      filtered = filtered.filter(n => !n.batchId || n.batchId === batchId);
+    }
+    if (userId) {
+      filtered = filtered.filter(n => n.targetUserId === userId || !n.targetUserId);
+    }
+    return { notifications: filtered };
   }
 
   // Not implemented endpoints return 501 so the UI can show a meaningful error
