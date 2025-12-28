@@ -4,6 +4,7 @@ import { api } from '../../utils/api';
 import { Calendar } from '../shared/Calendar';
 import { Notifications } from '../shared/Notifications';
 import { DemoDataSeeder } from './DemoDataSeeder';
+import { BatchManagement } from './BatchManagement';
 import {
   BookOpen,
   Users,
@@ -34,19 +35,20 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   const [isDark, setIsDark] = useState(false);
 
   // Forms
-  const [showNewBatch, setShowNewBatch] = useState(false);
-  const [newBatch, setNewBatch] = useState({ name: '', teacherId: '', meetLink: '' });
-  
   const [showNewUser, setShowNewUser] = useState(false);
   const [newUser, setNewUser] = useState({ username: '', password: '', role: 'student', name: '', batchId: '' });
   
+  // Batch creation / editing state (was missing)
+  const [showNewBatch, setShowNewBatch] = useState(false);
+  const [newBatch, setNewBatch] = useState({ name: '', teacherId: '', meetLink: '' });
+  const [editingBatch, setEditingBatch] = useState<any | null>(null);
+
   const [showNewSchedule, setShowNewSchedule] = useState(false);
   const [newSchedule, setNewSchedule] = useState({ batchId: '', date: '', time: '', title: '' });
   
   const [notificationMessage, setNotificationMessage] = useState('');
   const [notificationTarget, setNotificationTarget] = useState<'all' | 'teacher'>('all');
 
-  const [editingBatch, setEditingBatch] = useState<any>(null);
   const [editingUser, setEditingUser] = useState<any>(null);
 
   useEffect(() => {
