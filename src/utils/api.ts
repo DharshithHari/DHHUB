@@ -40,10 +40,22 @@ async function clientMockCall(endpoint: string, options: RequestInit = {}) {
 
   // Initialize stores
   const users = readStore<any[]>('mock_users', [
-    { id: 'admin:Dharshith24', username: 'Dharshith24', role: 'admin', name: 'Admin', batchId: null }
+    { id: 'admin:Dharshith24', username: 'Dharshith24', role: 'admin', name: 'Admin', batchId: null },
+    { id: 'teacher:1', username: 'teacher1', role: 'teacher', name: 'Teacher One', batchId: null },
+    { id: 'student:1', username: 'student1', role: 'student', name: 'Student One', batchId: 'batch:1' },
+    { id: 'student:2', username: 'student2', role: 'student', name: 'Student Two', batchId: 'batch:1' },
+    { id: 'student:3', username: 'student3', role: 'student', name: 'Student Three', batchId: 'batch:2' },
+    { id: 'student:4', username: 'student4', role: 'student', name: 'Student Four', batchId: 'batch:2' }
   ]);
-  const batches = readStore<any[]>('mock_batches', []);
+  const batches = readStore<any[]>('mock_batches', [
+    { id: 'batch:1', name: 'Demo Batch', teacherId: 'teacher:1', studentIds: ['student:1','student:2'], meetLink: 'https://meet.google.com/demo' },
+    { id: 'batch:2', name: 'Evening Batch', teacherId: 'teacher:1', studentIds: ['student:3','student:4'], meetLink: 'https://meet.google.com/evening' }
+  ]);
   const schedules = readStore<any[]>('mock_schedules', []);
+  const assignmentsStore = readStore<any[]>('mock_assignments', [
+    { id: 'assign:1', batchId: 'batch:1', title: 'Welcome Project', description: 'Initial demo assignment', dueDate: new Date(Date.now() + 7*24*60*60*1000).toISOString(), createdBy: 'teacher:1', submissions: [] },
+    { id: 'assign:2', batchId: 'batch:2', title: 'Evening Intro', description: 'Assignment for evening batch', dueDate: new Date(Date.now() + 10*24*60*60*1000).toISOString(), createdBy: 'teacher:1', submissions: [] }
+  ]);
 
   // parse query params if present
   const [path, q] = endpoint.split('?');
@@ -133,6 +145,14 @@ async function clientMockCall(endpoint: string, options: RequestInit = {}) {
   }
 
   // Batches: update/delete by id
+  // Batches: get/update/delete by id
+  if (path.startsWith('/batches/') && (!options.method || options.method === 'GET')) {
+    const id = path.replace('/batches/', '');
+    const found = batches.find(b => b.id === id);
+    if (!found) { const err: any = new Error('Not found'); err.status = 404; throw err; }
+    return { batch: found };
+  }
+
   if (path.startsWith('/batches/') && (options.method === 'PUT' || options.method === 'DELETE')) {
     const id = path.replace('/batches/', '');
     const idx = batches.findIndex(b => b.id === id);
@@ -184,6 +204,11 @@ async function clientMockCall(endpoint: string, options: RequestInit = {}) {
   // Notifications store
   const notifications = readStore<any[]>('mock_notifications', []);
 
+  // Assignments store helpers
+  function writeAssignmentsStore(v: any[]) {
+    writeStore('mock_assignments', v);
+  }
+
   // Create notification
   if (path === '/notifications' && options.method === 'POST') {
     const body = typeof options.body === 'string' ? JSON.parse(options.body as string) : {};
@@ -211,6 +236,51 @@ async function clientMockCall(endpoint: string, options: RequestInit = {}) {
       filtered = filtered.filter(n => n.targetUserId === userId || !n.targetUserId);
     }
     return { notifications: filtered };
+  }
+
+  // Assignments: create
+  if (path === '/assignments' && options.method === 'POST') {
+    const body = typeof options.body === 'string' ? JSON.parse(options.body as string) : {};
+    const id = `assign:${Date.now()}`;
+    const newAssign = { id, submissions: [], ...body };
+    assignmentsStore.unshift(newAssign);
+    writeAssignmentsStore(assignmentsStore);
+    return { assignment: newAssign };
+  }
+
+  // Assignments: list (supports batchId filter)
+  if (path === '/assignments' && (!options.method || options.method === 'GET')) {
+    const batchId = params.get('batchId');
+    const filtered = batchId ? assignmentsStore.filter(a => a.batchId === batchId) : assignmentsStore;
+    return { assignments: filtered };
+  }
+
+  // Submit assignment
+  if (path.match(/^\/assignments\/[^/]+\/submit$/) && options.method === 'POST') {
+    const id = path.replace('/assignments/', '').replace('/submit', '');
+    const idx = assignmentsStore.findIndex(a => a.id === id);
+    if (idx === -1) { const err: any = new Error('Not found'); err.status = 404; throw err; }
+    const body = typeof options.body === 'string' ? JSON.parse(options.body as string) : {};
+    const submission = { studentId: body.studentId, studentName: body.studentName, projectLink: body.projectLink, points: null };
+    assignmentsStore[idx].submissions = assignmentsStore[idx].submissions || [];
+    assignmentsStore[idx].submissions.push(submission);
+    writeAssignmentsStore(assignmentsStore);
+    return { submission };
+  }
+
+  // Grade assignment
+  if (path.match(/^\/assignments\/[^/]+\/grade$/) && options.method === 'POST') {
+    const id = path.replace('/assignments/', '').replace('/grade', '');
+    const idx = assignmentsStore.findIndex(a => a.id === id);
+    if (idx === -1) { const err: any = new Error('Not found'); err.status = 404; throw err; }
+    const body = typeof options.body === 'string' ? JSON.parse(options.body as string) : {};
+    const submission = assignmentsStore[idx].submissions.find((s: any) => s.studentId === body.studentId);
+    if (!submission) {
+      const err: any = new Error('Submission not found'); err.status = 404; throw err;
+    }
+    submission.points = body.points;
+    writeAssignmentsStore(assignmentsStore);
+    return { success: true };
   }
 
   // Not implemented endpoints return 501 so the UI can show a meaningful error

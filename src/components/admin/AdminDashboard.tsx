@@ -64,6 +64,27 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
     return () => window.removeEventListener('theme-changed', themeHandler as EventListener);
   }, []);
 
+  // Enforce permanent dark mode while admin dashboard is mounted
+  useEffect(() => {
+    const root = document.documentElement;
+    const prevWasDark = root.classList.contains('dark');
+    try {
+      root.classList.add('dark');
+      try { localStorage.setItem('theme', 'dark'); } catch {}
+      try { window.dispatchEvent(new CustomEvent('theme-changed', { detail: { isDark: true } })); } catch {}
+    } catch (e) {}
+
+    return () => {
+      try {
+        if (!prevWasDark) {
+          root.classList.remove('dark');
+          try { localStorage.setItem('theme', 'light'); } catch {}
+          try { window.dispatchEvent(new CustomEvent('theme-changed', { detail: { isDark: false } })); } catch {}
+        }
+      } catch (e) {}
+    };
+  }, []);
+
   const loadData = async () => {
     try {
       const [batchesRes, teachersRes, studentsRes, schedulesRes] = await Promise.all([
@@ -528,11 +549,14 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                             <p className="text-sm mb-2">Students ({batch.studentIds?.length || 0}):</p>
                             <div className="space-y-2 mb-3">
                               {students.filter(s => batch.studentIds?.includes(s.id)).map(student => (
-                                <div key={student.id} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded">
+                                <div
+                                  key={student.id}
+                                  className={`flex items-center justify-between px-3 py-2 rounded ${isDark ? 'bg-gray-700/40 text-gray-100' : 'bg-gray-50 text-gray-900'}`}
+                                >
                                   <span className="text-sm">{student.name}</span>
                                   <button
                                     onClick={() => handleRemoveStudentFromBatch(batch.id, student.id)}
-                                    className={`${isDark ? 'text-red-400 hover:text-red-200' : 'text-red-600 hover:text-red-800'}`}
+                                    className={`${isDark ? 'text-red-300 hover:text-red-100' : 'text-red-600 hover:text-red-800'}`}
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </button>
@@ -547,7 +571,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                                   e.target.value = '';
                                 }
                               }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                              className={`w-full px-3 py-2 border rounded text-sm ${isDark ? 'bg-gray-700 border-gray-600 text-gray-100' : 'border-gray-300 bg-white text-gray-900'}`}
                             >
                               <option value="">Add student...</option>
                               {students.filter(s => !batch.studentIds?.includes(s.id)).map(student => (
@@ -660,7 +684,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                     <h3 className="mb-3">Teachers ({teachers.length})</h3>
                     <div className="space-y-2">
                       {teachers.map(teacher => (
-                        <div key={teacher.id} className="p-3 border border-gray-200 rounded-lg">
+                        <div key={teacher.id} className={`p-3 border rounded-lg ${isDark ? 'border-gray-700 bg-gray-800 text-gray-100' : 'border-gray-200 bg-white text-gray-900'}`}>
                           {editingUser?.id === teacher.id ? (
                             <div className="space-y-2">
                               <input
@@ -692,7 +716,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                             <div className="flex items-center justify-between">
                               <div>
                                 <p>{teacher.name}</p>
-                                <p className="text-sm text-gray-600">@{teacher.username}</p>
+                                <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>@{teacher.username}</p>
+                                <p className={`text-sm mt-1 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>Password: <span className="font-mono">{teacher.password || '—'}</span></p>
                               </div>
                               <div className="flex items-center gap-2">
                                 <button
@@ -721,9 +746,9 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                   <div>
                     <h3 className="mb-3">Students ({students.length})</h3>
                     <div className="space-y-2">
-                      {students.map(student => (
-                        <div key={student.id} className="p-3 border border-gray-200 rounded-lg">
-                          {editingUser?.id === student.id ? (
+                        {students.map(student => (
+                          <div key={student.id} className={`p-3 border rounded-lg ${isDark ? 'border-gray-700 bg-gray-800 text-gray-100' : 'border-gray-200 bg-white text-gray-900'}`}>
+                            {editingUser?.id === student.id ? (
                             <div className="space-y-2">
                               <input
                                 className="w-full px-3 py-2 border rounded"
@@ -764,10 +789,12 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                             <div className="flex items-center justify-between">
                               <div>
                                 <p>{student.name}</p>
-                                <p className="text-sm text-gray-600">
+                                <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
                                   @{student.username}
                                   {student.batchId && ` • ${batches.find(b => b.id === student.batchId)?.name}`}
                                 </p>
+                                {/* Show password in admin view as requested */}
+                                <p className={`text-sm mt-1 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>Password: <span className="font-mono">{student.password || '—'}</span></p>
                               </div>
                               <div className="flex items-center gap-2">
                                 <button

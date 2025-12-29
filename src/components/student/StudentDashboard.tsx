@@ -33,6 +33,7 @@ interface Assignment {
 export function StudentDashboard({ user, onLogout }: StudentDashboardProps) {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [batch, setBatch] = useState<any>(null);
+  const [teacher, setTeacher] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'assignments' | 'scores' | 'class'>('assignments');
   const [isDark, setIsDark] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -121,6 +122,16 @@ export function StudentDashboard({ user, onLogout }: StudentDashboardProps) {
 
         setAssignments(newAssignments);
         setBatch(batchRes.batch);
+
+        // fetch teacher info for this batch (if available)
+        try {
+          const teachersRes = await api.getUsers('teacher');
+          const allTeachers = (teachersRes && teachersRes.users) ? teachersRes.users : [];
+          const t = allTeachers.find((u: any) => u.id === batchRes.batch.teacherId);
+          setTeacher(t || null);
+        } catch (e) {
+          setTeacher(null);
+        }
       }
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -233,6 +244,9 @@ export function StudentDashboard({ user, onLogout }: StudentDashboardProps) {
               <div>
                 <p className={textClass}>Batch</p>
                 <p className="text-xl mt-1">{batch?.name || 'Not Assigned'}</p>
+                {teacher && (
+                  <p className={`text-sm mt-1 ${textClass}`}>Teacher: {teacher.name}</p>
+                )}
               </div>
               <BookOpen className="w-12 h-12 text-green-500" />
             </div>

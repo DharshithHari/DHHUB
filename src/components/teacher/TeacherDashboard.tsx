@@ -33,6 +33,8 @@ interface Assignment {
 export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [batch, setBatch] = useState<any>(null);
+  const [batches, setBatches] = useState<any[]>([]);
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const [students, setStudents] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'assignments' | 'students' | 'class' | 'notifications'>('assignments');
   const [loading, setLoading] = useState(true);
@@ -94,41 +96,67 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
     };
   }, [batch?.id]);
 
+  useEffect(() => {
+    if (!selectedBatchId) return;
+    const selected = batches.find(b => b.id === selectedBatchId);
+    if (selected) {
+      setBatch(selected);
+      setLoading(true);
+      loadBatchData(selected).finally(() => setLoading(false));
+    }
+  }, [selectedBatchId]);
+
   const loadData = async () => {
     try {
-      // Get all batches to find which batch this teacher manages
+      // Get all batches for this teacher
       const batchesRes = await api.getBatches();
-      const teacherBatch = batchesRes.batches.find((b: any) => b.teacherId === user.id);
-      
-      if (teacherBatch) {
+      const teacherBatches = (batchesRes.batches || []).filter((b: any) => b.teacherId === user.id);
+      setBatches(teacherBatches || []);
+
+      // prefer previously selected batch if it still exists, otherwise pick first
+      const initialId = selectedBatchId && teacherBatches.some((b: any) => b.id === selectedBatchId)
+        ? selectedBatchId
+        : (teacherBatches[0]?.id || null);
+
+      if (initialId) {
+        setSelectedBatchId(initialId);
+        const teacherBatch = teacherBatches.find((b: any) => b.id === initialId);
         setBatch(teacherBatch);
-        
-        const [assignmentsRes, usersRes] = await Promise.all([
-          api.getAssignments(teacherBatch.id),
-          api.getUsers('student')
-        ]);
-
-        setAssignments(assignmentsRes.assignments || []);
-
-        // Filter students in this batch. If the students list is empty or
-        // doesn't include expected students, also fetch all users and
-        // resolve by `batch.studentIds` as a fallback (some mocks/store
-        // shapes use batch.studentIds instead of setting student.batchId).
-        let batchStudents = (usersRes && usersRes.users) ? usersRes.users.filter((s: any) => s.batchId === teacherBatch.id) : [];
-
-        if ((batchStudents.length === 0 || !batchStudents.some((s: any) => s.batchId === teacherBatch.id)) && teacherBatch.studentIds && teacherBatch.studentIds.length > 0) {
-          // fetch all users and match by id
-          const allUsersRes = await api.getUsers();
-          const allUsers = (allUsersRes && allUsersRes.users) ? allUsersRes.users : [];
-          batchStudents = teacherBatch.studentIds.map((id: string) => allUsers.find((u: any) => u.id === id)).filter(Boolean);
-        }
-
-        setStudents(batchStudents || []);
+        await loadBatchData(teacherBatch);
+      } else {
+        setBatch(null);
+        setAssignments([]);
+        setStudents([]);
       }
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadBatchData = async (teacherBatch: any) => {
+    try {
+      const [assignmentsRes, usersRes] = await Promise.all([
+        api.getAssignments(teacherBatch.id),
+        api.getUsers('student')
+      ]);
+
+      setAssignments(assignmentsRes.assignments || []);
+
+      let batchStudents = (usersRes && usersRes.users) ? usersRes.users.filter((s: any) => s.batchId === teacherBatch.id) : [];
+
+      if ((batchStudents.length === 0 || !batchStudents.some((s: any) => s.batchId === teacherBatch.id)) && teacherBatch.studentIds && teacherBatch.studentIds.length > 0) {
+        const allUsersRes = await api.getUsers();
+        const allUsers = (allUsersRes && allUsersRes.users) ? allUsersRes.users : [];
+        batchStudents = teacherBatch.studentIds.map((id: string) => allUsers.find((u: any) => u.id === id)).filter(Boolean);
+      }
+
+      setStudents(batchStudents || []);
+    } catch (err) {
+      console.error('Failed to load batch data', err);
+      setAssignments([]);
+      setStudents([]);
     }
   };
 
@@ -281,7 +309,21 @@ export function TeacherDashboard({ user, onLogout }: TeacherDashboardProps) {
             <div className="relative flex items-center justify-between">
               <div>
                 <p className={`${isDark ? 'text-yellow-300' : 'text-yellow-600'} font-medium transition-colors duration-300`}>Batch</p>
-                <p className={`text-2xl mt-2 font-bold ${isDark ? 'text-white' : 'text-gray-900'} transition-colors duration-300`}>{batch?.name || 'Not Assigned'}</p>
+                <div className="mt-2">
+                  {batches.length > 1 ? (
+                    <select
+                      value={selectedBatchId || ''}
+                      onChange={(e) => setSelectedBatchId(e.target.value || null)}
+                      className="px-3 py-2 border rounded-lg bg-white"
+                    >
+                      {batches.map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className={`text-2xl mt-2 font-bold ${isDark ? 'text-white' : 'text-gray-900'} transition-colors duration-300`}>{batch?.name || 'Not Assigned'}</p>
+                  )}
+                </div>
                 <div className="mt-2 w-full bg-yellow-200 dark:bg-yellow-900/30 rounded-full h-1">
                   <div className="bg-yellow-500 h-1 rounded-full transition-all duration-1000" style={{width: batch ? '100%' : '0%'}}></div>
                 </div>

@@ -191,17 +191,20 @@ export function BatchManagement({
                   <div className="mt-3 pt-3 border-t border-gray-200">
                     <p className="text-sm mb-2">Students ({batch.studentIds?.length || 0}):</p>
                     <div className="space-y-2 mb-3">
-                      {students.filter(s => batch.studentIds?.includes(s.id)).map(student => (
-                        <div key={student.id} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded">
-                          <span className="text-sm">{student.name}</span>
-                          <button
-                            onClick={() => onRemoveStudentFromBatch(batch.id, student.id)}
-                            className="text-red-600 hover:text-red-800"
+                        {students.filter(s => batch.studentIds?.includes(s.id)).map(student => (
+                          <div
+                            key={student.id}
+                            className={`flex items-center justify-between px-3 py-2 rounded ${isDark ? 'bg-gray-700/40 text-gray-100' : 'bg-gray-50 text-gray-900'}`}
                           >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
+                            <span className="text-sm">{student.name}</span>
+                            <button
+                              onClick={() => onRemoveStudentFromBatch(batch.id, student.id)}
+                              className={`${isDark ? 'text-red-300 hover:text-red-100' : 'text-red-600 hover:text-red-800'}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
                     </div>
                     
                     <select
