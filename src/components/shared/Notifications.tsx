@@ -42,24 +42,24 @@ export function Notifications({ role, batchId, userId, isDark }: NotificationsPr
 
   if (loading) {
     return (
-      <div className={`p-6 rounded-xl ${isDark ? 'bg-gray-800' : 'bg-white'} shadow-lg`}>
+      <div className={`p-6 rounded-xl ${isDark ? 'bg-gray-800' : 'bg-white'} shadow-lg dark:bg-gray-800`}>
         <div className="animate-pulse space-y-4">
-          <div className={`h-6 ${isDark ? 'bg-gray-700' : 'bg-gray-200'} rounded w-1/3`}></div>
-          <div className={`h-20 ${isDark ? 'bg-gray-700' : 'bg-gray-200'} rounded`}></div>
+          <div className={`h-6 ${isDark ? 'bg-gray-700' : 'bg-gray-200'} rounded w-1/3 dark:bg-gray-700`}></div>
+          <div className={`h-20 ${isDark ? 'bg-gray-700' : 'bg-gray-200'} rounded dark:bg-gray-700`}></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`p-6 rounded-xl ${isDark ? 'bg-gray-800' : 'bg-white'} shadow-lg`}>
+    <div className={`p-6 rounded-xl ${isDark ? 'bg-gray-800' : 'bg-white'} shadow-lg dark:bg-gray-800`}>
       <div className="flex items-center gap-2 mb-4">
-        <Bell className={`w-5 h-5 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} />
-        <h3 className={isDark ? 'text-white' : 'text-gray-900'}>Notifications</h3>
+        <Bell className={`w-5 h-5 ${isDark ? 'text-indigo-400' : 'text-indigo-600'} dark:text-indigo-400`} />
+        <h3 className={isDark ? 'text-white' : 'text-gray-900 dark:text-white'}>Notifications</h3>
       </div>
 
       {notifications.length === 0 ? (
-        <p className={`text-center py-8 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+        <p className={`text-center py-8 ${isDark ? 'text-gray-400' : 'text-gray-500 dark:text-gray-400'}`}>
           No notifications yet
         </p>
       ) : (
@@ -70,15 +70,15 @@ export function Notifications({ role, batchId, userId, isDark }: NotificationsPr
               className={`p-4 rounded-lg border ${
                 isDark
                   ? 'bg-gray-700 border-gray-600'
-                  : 'bg-blue-50 border-blue-200'
+                  : 'bg-blue-50 border-blue-200 dark:bg-gray-700 dark:border-gray-600'
               }`}
             >
               <div className="flex items-start justify-between gap-2 mb-2">
                 <div>
-                  <span className={`text-sm ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>
+                  <span className={`text-sm ${isDark ? 'text-indigo-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
                     {notification.senderName}
                   </span>
-                  <div className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <div className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500 dark:text-gray-400'}`}>
                     {new Date(notification.timestamp).toLocaleString()}
                   </div>
                 </div>
@@ -86,7 +86,7 @@ export function Notifications({ role, batchId, userId, isDark }: NotificationsPr
                   {/* delete button removed */}
                 </div>
               </div>
-              <p className={isDark ? 'text-gray-300' : 'text-gray-700'}>
+              <p className={isDark ? 'text-gray-300' : 'text-gray-700 dark:text-gray-300'}>
                 {notification.message}
               </p>
             </div>
