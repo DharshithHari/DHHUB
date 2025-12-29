@@ -180,9 +180,9 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               : 'bg-gray-50 border-gray-200 text-gray-600'
           }`}>
             <p className="text-sm">
-              <strong>Demo Admin Credentials:</strong><br />
-              Username: Dharshith24<br />
-              Password: dharshith@hari24
+              <strong>Welcome!!!</strong><br />
+              Enter The Password Correctly<br />
+              Wrong Attempts Will Lead To Account Suspension.
             </p>
           </div>
         )}
