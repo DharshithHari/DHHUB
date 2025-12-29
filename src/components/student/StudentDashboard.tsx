@@ -33,6 +33,8 @@ interface Assignment {
 export function StudentDashboard({ user, onLogout }: StudentDashboardProps) {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [batch, setBatch] = useState<any>(null);
+  const [batches, setBatches] = useState<any[]>([]);
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(user.batchId || null);
   const [teacher, setTeacher] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'assignments' | 'scores' | 'class'>('assignments');
   const [isDark, setIsDark] = useState(false);
@@ -41,24 +43,72 @@ export function StudentDashboard({ user, onLogout }: StudentDashboardProps) {
   const [gradePopup, setGradePopup] = useState<{ open: boolean; points?: number; title?: string }>({ open: false });
   const prevPointsRef = useRef<Record<string, number | null>>({});
   const firstLoadRef = useRef(true);
+  const loadSeenGrades = () => {
+    try {
+      const raw = localStorage.getItem('seenGrades');
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {} as Record<string, number | null>;
+    }
+  };
+  const seenGradesRef = useRef<Record<string, number | null>>(loadSeenGrades());
 
   useEffect(() => {
     let t: any;
+    let audioCtx: AudioContext | null = null;
+    let stopFlag = false;
+
+    // Play a short celebratory melody using WebAudio when popup opens
+    const playCelebrate = async () => {
+      try {
+        const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+        if (!AudioCtx) return;
+        audioCtx = new AudioCtx();
+        const gain = audioCtx.createGain();
+        gain.connect(audioCtx.destination);
+        gain.gain.value = 0.001;
+
+        const notes = [880, 988, 1175, 988]; // simple ascending melody
+        let now = audioCtx.currentTime + 0.05;
+        for (let i = 0; i < notes.length && !stopFlag; i++) {
+          const o = audioCtx.createOscillator();
+          o.type = 'sine';
+          o.frequency.value = notes[i];
+          o.connect(gain);
+          o.start(now + i * 0.12);
+          o.stop(now + i * 0.12 + 0.18);
+        }
+        // Ramp volume to pleasant level then down
+        gain.gain.linearRampToValueAtTime(0.12, audioCtx.currentTime + 0.08);
+        gain.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + 1.2);
+      } catch (e) {
+        // ignore audio errors
+      }
+    };
+
     if (gradePopup.open) {
-      t = setTimeout(() => setGradePopup({ open: false }), 4200);
+      // Play sound once when popup opens
+      playCelebrate();
+      // Keep popup visible for 20 seconds
+      t = setTimeout(() => setGradePopup({ open: false }), 20000);
     }
-    return () => clearTimeout(t);
+
+    return () => {
+      stopFlag = true;
+      try { if (audioCtx) { audioCtx.close(); } } catch {}
+      clearTimeout(t);
+    };
   }, [gradePopup.open]);
 
   useEffect(() => {
     loadData();
-  }, [user.batchId]);
+  }, [selectedBatchId, user.id]);
 
   useEffect(() => {
     const handler = (e: any) => {
       try {
         const detailBatchId = e?.detail?.batchId;
-        if (!detailBatchId || detailBatchId === user.batchId) {
+        if (!detailBatchId || detailBatchId === selectedBatchId) {
           // reload batch and assignments
           loadData();
         }
@@ -83,30 +133,61 @@ export function StudentDashboard({ user, onLogout }: StudentDashboardProps) {
       window.removeEventListener('users-updated', handler as EventListener);
       window.removeEventListener('theme-changed', themeHandler as EventListener);
     };
-  }, [user.batchId]);
+  }, [selectedBatchId]);
 
   const loadData = async () => {
     try {
-      if (user.batchId) {
+      // Fetch all batches and determine which batches the student belongs to
+      const batchesRes = await api.getBatches();
+      const allBatches = batchesRes.batches || [];
+      const studentBatches = allBatches.filter((b: any) => (b.studentIds || []).includes(user.id));
+      setBatches(studentBatches || []);
+
+      // Determine active batch id (preference: selectedBatchId -> user.batchId -> first student batch)
+      const activeId = selectedBatchId && studentBatches.some((b: any) => b.id === selectedBatchId)
+        ? selectedBatchId
+        : (user.batchId || (studentBatches[0] && studentBatches[0].id) || null);
+
+      if (activeId) {
         const [assignmentsRes, batchRes] = await Promise.all([
-          api.getAssignments(user.batchId),
-          api.getBatch(user.batchId)
+          api.getAssignments(activeId),
+          api.getBatch(activeId)
         ]);
         const newAssignments = assignmentsRes.assignments || [];
 
-        // Compare with previous points and show popup on increase
+        // Compare with previous points and show popup on increase.
+        // On first app load for this session, compare against persisted `seenGrades` so
+        // students see celebrations for newly-graded items they haven't acknowledged yet.
         if (!firstLoadRef.current) {
           for (const a of newAssignments) {
             const mySub = a.submissions.find((s: any) => s.studentId === user.id);
-            const prev = prevPointsRef.current[a.id] ?? null;
+            const prev = Object.prototype.hasOwnProperty.call(prevPointsRef.current, a.id)
+              ? prevPointsRef.current[a.id]
+              : null;
             const now = mySub?.points ?? null;
-            if ((prev === null || prev === undefined) && now !== null) {
-              // newly graded
-              setGradePopup({ open: true, points: now, title: a.title });
-              break;
-            }
             if (prev !== null && now !== null && now > (prev as number)) {
               setGradePopup({ open: true, points: now, title: a.title });
+              // mark as seen for this points value so it won't re-fire
+              try {
+                seenGradesRef.current[a.id] = now;
+                localStorage.setItem('seenGrades', JSON.stringify(seenGradesRef.current));
+              } catch (e) {}
+              break;
+            }
+          }
+        } else {
+          for (const a of newAssignments) {
+            const mySub = a.submissions.find((s: any) => s.studentId === user.id);
+            const now = mySub?.points ?? null;
+            const seen = Object.prototype.hasOwnProperty.call(seenGradesRef.current, a.id)
+              ? seenGradesRef.current[a.id]
+              : null;
+            if (now !== null && seen !== now) {
+              setGradePopup({ open: true, points: now, title: a.title });
+              try {
+                seenGradesRef.current[a.id] = now;
+                localStorage.setItem('seenGrades', JSON.stringify(seenGradesRef.current));
+              } catch (e) {}
               break;
             }
           }
@@ -147,9 +228,13 @@ export function StudentDashboard({ user, onLogout }: StudentDashboardProps) {
         const { assignmentId, studentId, points } = e?.detail || {};
         if (!assignmentId) return;
         if (studentId === user.id) {
-          // show popup
+          // show popup and mark this grade as seen so it won't re-fire
           const assignment = assignments.find(a => a.id === assignmentId);
           setGradePopup({ open: true, points, title: assignment?.title || 'Assignment' });
+          try {
+            seenGradesRef.current[assignmentId] = points ?? null;
+            localStorage.setItem('seenGrades', JSON.stringify(seenGradesRef.current));
+          } catch (e) {}
         }
         // reload data to update local view
         loadData();
@@ -181,6 +266,8 @@ export function StudentDashboard({ user, onLogout }: StudentDashboardProps) {
     const submission = getMySubmission(assignment);
     return sum + (submission?.points || 0);
   }, 0);
+
+  // (No global total-points watcher — celebration is triggered on assignment-level increases only)
 
   const bgClass = isDark ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-indigo-100';
   const cardClass = isDark ? 'bg-gray-800 text-white' : 'bg-white text-gray-900';
@@ -243,7 +330,21 @@ export function StudentDashboard({ user, onLogout }: StudentDashboardProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className={textClass}>Batch</p>
-                <p className="text-xl mt-1">{batch?.name || 'Not Assigned'}</p>
+                <div className="mt-1">
+                  {batches.length > 1 ? (
+                    <select
+                      value={selectedBatchId || ''}
+                      onChange={(e) => setSelectedBatchId(e.target.value || null)}
+                      className="px-3 py-2 border rounded-lg bg-white"
+                    >
+                      {batches.map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-xl mt-1">{batch?.name || 'Not Assigned'}</p>
+                  )}
+                </div>
                 {teacher && (
                   <p className={`text-sm mt-1 ${textClass}`}>Teacher: {teacher.name}</p>
                 )}
@@ -479,9 +580,9 @@ export function StudentDashboard({ user, onLogout }: StudentDashboardProps) {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            <Calendar batchId={user.batchId} isDark={isDark} />
+            <Calendar batchId={selectedBatchId || batch?.id} isDark={isDark} />
             {/* UpcomingClass removed — Calendar shows upcoming classes already */}
-            <Notifications role="student" batchId={user.batchId} userId={user.id} isDark={isDark} />
+            <Notifications role="student" batchId={selectedBatchId || batch?.id} userId={user.id} isDark={isDark} />
           </div>
         </div>
       </div>
