@@ -27,7 +27,7 @@ const BASE_URL = envBase || ((typeof window !== 'undefined' && (window.location.
   : DEFAULT_BASE);
 
 // Firebase client helpers (used for client-side sign-in)
-import { getFirebaseAuth } from './firebase';
+import { getFirebaseAuth } from './firebase.ts';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 
 // If the developer sets `VITE_API_BASE=LOCAL_MOCK` we bypass network calls and
