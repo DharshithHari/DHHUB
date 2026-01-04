@@ -2,17 +2,13 @@ import { Hono } from 'npm:hono';
 import { cors } from 'npm:hono/cors';
 import { logger } from 'npm:hono/logger';
 import * as kv from './kv_store.tsx';
-import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const app = new Hono();
 
 app.use('*', cors());
 app.use('*', logger(console.log));
 
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-);
+// Supabase removed; using Firebase-admin backed `kv_store` for persistent storage.
 
 // Utility function to hash password (simple for demo)
 function hashPassword(password: string): string {
@@ -43,35 +39,64 @@ initializeDefaultUsers();
 // Auth Routes
 app.post('/make-server-f258bbc4/auth/login', async (c) => {
   try {
-    const { username, password, role } = await c.req.json();
-    
+    const body = await c.req.json();
+
+    // Prefer Firebase ID token authentication: client signs in using
+    // Firebase client SDK and posts { idToken } to this endpoint.
+    if (body && body.idToken) {
+      try {
+        // Require firebase-admin at runtime
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const admin = require('firebase-admin');
+        const decoded = await admin.auth().verifyIdToken(body.idToken);
+        const uid = decoded.uid;
+        const userRecord = await admin.auth().getUser(uid).catch(() => null);
+
+        const sessionId = crypto.randomUUID();
+        const profile = await kv.get(`user:${uid}`) || {
+          id: uid,
+          username: userRecord?.email || uid,
+          role: 'student',
+          name: userRecord?.displayName || null,
+        };
+
+        await kv.set(`session:${sessionId}`, {
+          userId: profile.id,
+          username: profile.username,
+          role: profile.role,
+          name: profile.name || null,
+          batchId: profile.batchId || null,
+        });
+
+        // Ensure a profile exists
+        if (!await kv.get(`user:${uid}`)) {
+          await kv.set(`user:${uid}`, profile);
+        }
+
+        return c.json({ success: true, sessionId, user: profile });
+      } catch (tokErr) {
+        console.error('ID token verification failed', tokErr);
+        return c.json({ error: 'Invalid ID token' }, 401);
+      }
+    }
+
+    // Fallback: legacy username/password stored in KV
+    const { username, password, role } = body;
     const user = await kv.get(`user:${role}:${username}`);
-    
     if (!user || !verifyPassword(password, user.password)) {
       return c.json({ error: 'Invalid credentials' }, 401);
     }
-    
-    // Create session
+
     const sessionId = crypto.randomUUID();
     await kv.set(`session:${sessionId}`, {
       userId: user.id,
       username: user.username,
       role: user.role,
       name: user.name,
-      batchId: user.batchId || null
+      batchId: user.batchId || null,
     });
-    
-    return c.json({ 
-      success: true, 
-      sessionId,
-      user: {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        name: user.name,
-        batchId: user.batchId || null
-      }
-    });
+
+    return c.json({ success: true, sessionId, user: { ...user, password: undefined } });
   } catch (error) {
     console.error('Login error:', error);
     return c.json({ error: 'Login failed' }, 500);
@@ -113,27 +138,51 @@ app.post('/make-server-f258bbc4/auth/logout', async (c) => {
 // User Management Routes
 app.post('/make-server-f258bbc4/users', async (c) => {
   try {
-    const { username, password, role, name, batchId } = await c.req.json();
-    
+    const { username, email, password, role, name, batchId } = await c.req.json();
+
+    // If Firebase Admin is available and an email+password are provided,
+    // create the user in Firebase Auth and store a profile keyed by UID.
+    try {
+      if (email && password) {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const admin = require('firebase-admin');
+        const record = await admin.auth().createUser({ email, password, displayName: name }).catch((e: any) => { throw e; });
+        const uid = record.uid;
+        const profile = {
+          id: uid,
+          username: email,
+          role: role || 'student',
+          name: name || null,
+          batchId: batchId || null,
+          createdAt: new Date().toISOString(),
+        };
+        await kv.set(`user:${uid}`, profile);
+        return c.json({ success: true, user: profile });
+      }
+    } catch (adminErr) {
+      console.error('Firebase Admin createUser failed (falling back to legacy store):', adminErr);
+      // fall through to legacy behavior
+    }
+
+    // Legacy fallback: username/role based user stored in KV (kept for compatibility)
     const userId = `${role}:${username}`;
     const existingUser = await kv.get(`user:${userId}`);
-    
     if (existingUser) {
       return c.json({ error: 'Username already exists' }, 400);
     }
-    
+
     const user = {
       id: userId,
       username,
-      password: hashPassword(password),
+      password: hashPassword(password || ''),
       role,
       name,
       batchId: batchId || null,
       createdAt: new Date().toISOString()
     };
-    
+
     await kv.set(`user:${userId}`, user);
-    
+
     return c.json({ success: true, user: { ...user, password: undefined } });
   } catch (error) {
     console.error('Create user error:', error);

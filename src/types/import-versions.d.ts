@@ -203,15 +203,7 @@ declare module "npm:hono/logger" {
   const _default: Any; export default _default;
 }
 
-declare module "npm:@supabase/supabase-js@2" {
-  export * from "@supabase/supabase-js";
-  const _default: Any; export default _default;
-}
 
-declare module "jsr:@supabase/supabase-js@2.49.8" {
-  export * from "@supabase/supabase-js";
-  const _default: Any; export default _default;
-}
 
 // Fallthrough - keep a generic module declaration for anything else
 declare module "*@*" {

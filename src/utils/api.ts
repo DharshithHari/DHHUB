@@ -1,17 +1,34 @@
-import { projectId, publicAnonKey } from './supabase/info';
-
-const DEFAULT_BASE = `https://${projectId}.supabase.co/functions/v1/make-server-f258bbc4`;
+// Allow an explicit VITE_API_BASE to override function host (prod or dev).
+let _import_meta: any;
+if (typeof window !== 'undefined' && (window as any).__import_meta_fallback__) {
+  _import_meta = (window as any).__import_meta_fallback__;
+} else {
+  try {
+    // Access `import.meta` at runtime via a dynamic Function to avoid
+    // parse-time TypeScript/TSX errors from `as` assertions.
+    // eslint-disable-next-line no-new-func
+    const getImportMeta = new Function('return (typeof import !== "undefined" && import.meta) ? import.meta : undefined');
+    _import_meta = getImportMeta();
+  } catch (e) {
+    _import_meta = undefined;
+  }
+}
+// Default to local fallback endpoint for the legacy server route.
+const DEFAULT_BASE = `http://localhost:4000/functions/v1/make-server-f258bbc4`;
 const LOCAL_FALLBACK = `http://localhost:4000/functions/v1/make-server-f258bbc4`;
 
 // Allow explicit override via Vite env var VITE_API_BASE (set this when running dev to force localhost)
-declare const import_meta: any;
-const envBase = typeof (import.meta) !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_BASE
-  ? (import.meta as any).env.VITE_API_BASE
+const envBase = _import_meta && _import_meta.env && _import_meta.env.VITE_API_BASE
+  ? _import_meta.env.VITE_API_BASE
   : null;
 
 const BASE_URL = envBase || ((typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
   ? LOCAL_FALLBACK
   : DEFAULT_BASE);
+
+// Firebase client helpers (used for client-side sign-in)
+import { getFirebaseAuth } from './firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 // If the developer sets `VITE_API_BASE=LOCAL_MOCK` we bypass network calls and
 // use an in-browser mock implementation. This is useful when DNS/network to
@@ -313,7 +330,7 @@ async function apiCall(endpoint: string, options: RequestInit = {}) {
   }
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${publicAnonKey}`,
+    // No global bearer token required when using Firebase-backed server
     ...(options.headers || {}),
   };
 
@@ -363,11 +380,27 @@ async function apiCall(endpoint: string, options: RequestInit = {}) {
 
 export const api = {
   // Auth
-  login: (username: string, password: string, role: string) =>
-    apiCall('/auth/login', {
+  login: async (email: string, password: string, role: string) => {
+    // Try Firebase client sign-in first (recommended)
+    if (typeof window !== 'undefined') {
+      try {
+        const auth = getFirebaseAuth();
+        const res = await signInWithEmailAndPassword(auth, email, password);
+        const idToken = await res.user.getIdToken();
+        return apiCall('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ idToken }),
+        });
+      } catch (e) {
+        // Fall back to legacy username/password API
+        console.warn('Firebase sign-in failed, falling back to legacy auth:', e);
+      }
+    }
+    return apiCall('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password, role }),
-    }),
+      body: JSON.stringify({ username: email, password, role }),
+    });
+  },
 
   checkSession: () => apiCall('/auth/session'),
 

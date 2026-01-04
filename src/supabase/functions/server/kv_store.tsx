@@ -10,78 +10,72 @@ CREATE TABLE kv_store_f258bbc4 (
 // View at https://supabase.com/dashboard/project/bnjiemwngpbweiphjyvv/database/tables
 
 // This file provides a simple key-value interface for storing Figma Make data. It should be adequate for most small-scale use cases.
-import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
+import { initFirebaseAdmin } from '../../../utils/firebaseAdmin';
 
-const client = () => createClient(
-  Deno.env.get("SUPABASE_URL"),
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
-);
+// Initialize Firebase Admin (no-op if already initialized)
+initFirebaseAdmin();
+
+const COLLECTION = 'kv_store_f258bbc4';
+
+function getDb() {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const admin = require('firebase-admin');
+  return admin.firestore();
+}
 
 // Set stores a key-value pair in the database.
 export const set = async (key: string, value: any): Promise<void> => {
-  const supabase = client()
-  const { error } = await supabase.from("kv_store_f258bbc4").upsert({
-    key,
-    value
-  });
-  if (error) {
-    throw new Error(error.message);
-  }
+  const db = getDb();
+  await db.collection(COLLECTION).doc(key).set({ value });
 };
 
 // Get retrieves a key-value pair from the database.
 export const get = async (key: string): Promise<any> => {
-  const supabase = client()
-  const { data, error } = await supabase.from("kv_store_f258bbc4").select("value").eq("key", key).maybeSingle();
-  if (error) {
-    throw new Error(error.message);
-  }
-  return data?.value;
+  const db = getDb();
+  const doc = await db.collection(COLLECTION).doc(key).get();
+  if (!doc.exists) return undefined;
+  const d = doc.data() as any;
+  return d?.value;
 };
 
 // Delete deletes a key-value pair from the database.
 export const del = async (key: string): Promise<void> => {
-  const supabase = client()
-  const { error } = await supabase.from("kv_store_f258bbc4").delete().eq("key", key);
-  if (error) {
-    throw new Error(error.message);
-  }
+  const db = getDb();
+  await db.collection(COLLECTION).doc(key).delete();
 };
 
 // Sets multiple key-value pairs in the database.
 export const mset = async (keys: string[], values: any[]): Promise<void> => {
-  const supabase = client()
-  const { error } = await supabase.from("kv_store_f258bbc4").upsert(keys.map((k, i) => ({ key: k, value: values[i] })));
-  if (error) {
-    throw new Error(error.message);
-  }
+  const db = getDb();
+  const batch = db.batch();
+  keys.forEach((k, i) => {
+    const ref = db.collection(COLLECTION).doc(k);
+    batch.set(ref, { value: values[i] });
+  });
+  await batch.commit();
 };
 
 // Gets multiple key-value pairs from the database.
 export const mget = async (keys: string[]): Promise<any[]> => {
-  const supabase = client()
-  const { data, error } = await supabase.from("kv_store_f258bbc4").select("value").in("key", keys);
-  if (error) {
-    throw new Error(error.message);
-  }
-  return data?.map((d) => d.value) ?? [];
+  const db = getDb();
+  const docs = await Promise.all(keys.map(k => db.collection(COLLECTION).doc(k).get()));
+  return docs.map(d => (d.exists ? (d.data() as any).value : undefined));
 };
 
 // Deletes multiple key-value pairs from the database.
 export const mdel = async (keys: string[]): Promise<void> => {
-  const supabase = client()
-  const { error } = await supabase.from("kv_store_f258bbc4").delete().in("key", keys);
-  if (error) {
-    throw new Error(error.message);
-  }
+  const db = getDb();
+  const batch = db.batch();
+  keys.forEach(k => batch.delete(db.collection(COLLECTION).doc(k)));
+  await batch.commit();
 };
 
 // Search for key-value pairs by prefix.
 export const getByPrefix = async (prefix: string): Promise<any[]> => {
-  const supabase = client()
-  const { data, error } = await supabase.from("kv_store_f258bbc4").select("key, value").like("key", prefix + "%");
-  if (error) {
-    throw new Error(error.message);
-  }
-  return data?.map((d) => d.value) ?? [];
+  const db = getDb();
+  // Query by document ID range for prefix (Firestore uses __name__ for doc id ordering)
+  const start = prefix;
+  const end = prefix + '\uf8ff';
+  const snapshot = await db.collection(COLLECTION).orderBy('__name__').startAt(start).endAt(end).get();
+  return snapshot.docs.map(d => (d.data() as any).value);
 };
